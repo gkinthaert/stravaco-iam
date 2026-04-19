@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Stravaco IAM groups and users"
+
+Resources:
+  DeveloperGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: "Developer_Group"
+      ManagedPolicyArns: 
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+ 
+
+  AdminUser1:
+    Type: AWS::IAM::User
+    Properties:
+      Groups: 
+        - !Ref DeveloperGroup
+      UserName: "Sidhar-Brahamian"
+   
