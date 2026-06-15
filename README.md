@@ -10,7 +10,7 @@ Deliverables - general:
 
 Deliverables - IaC
 1. Cloudformation template
-2. Terraform
+2. Terraform configuration file
 3. TypeScript
 
 
