@@ -1,0 +1,426 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  CloudFormation stack to create IAM Groups with defined access policies and
+  IAM Users assigned to those groups. Developer_Group includes a Deny policy
+  for destructive actions against Production-tagged resources. All groups carry
+  Environment tags (Development | Production).
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+  Environment:
+    Type: String
+    Default: Development
+    AllowedValues:
+      - Development
+      - Production
+    Description: >
+      Deployment environment tag applied to IAM users. For Developer_Group,
+      the Deny policy targets resources tagged Environment=Production regardless
+      of this parameter value.
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # =========================================================================
+  # 1. DEVELOPER GROUP
+  # =========================================================================
+  DeveloperGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: Developer_Group
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/CloudWatchEventsFullAccess
+
+  # Inline policy: Deny destructive actions when the target resource is tagged
+  # Environment=Production; allow the same actions when tagged Development.
+  DeveloperGroupProductionDenyPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: Developer_Group_ProductionDestructiveDeny
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyEC2DestructiveOnProduction
+            Effect: Deny
+            Action:
+              - ec2:TerminateInstances
+              - ec2:StopInstances
+              - ec2:RebootInstances
+              - ec2:DeleteVolume
+              - ec2:DeleteSnapshot
+              - ec2:DeleteSecurityGroup
+              - ec2:DeleteSubnet
+              - ec2:DeleteVpc
+              - ec2:DeleteInternetGateway
+              - ec2:DeleteRouteTable
+              - ec2:DeleteRoute
+              - ec2:DeleteNetworkAcl
+              - ec2:DeleteKeyPair
+              - ec2:DeleteLaunchTemplate
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/Environment": "Production"
+
+          - Sid: DenyS3DestructiveOnProduction
+            Effect: Deny
+            Action:
+              - s3:DeleteObject
+              - s3:DeleteObjectVersion
+              - s3:DeleteBucket
+              - s3:DeleteBucketPolicy
+              - s3:DeleteBucketWebsite
+              - s3:PutBucketPolicy
+              - s3:PutLifecycleConfiguration
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/Environment": "Production"
+
+          - Sid: AllowEC2DestructiveOnDevelopment
+            Effect: Allow
+            Action:
+              - ec2:TerminateInstances
+              - ec2:StopInstances
+              - ec2:RebootInstances
+              - ec2:DeleteVolume
+              - ec2:DeleteSnapshot
+              - ec2:DeleteSecurityGroup
+              - ec2:DeleteSubnet
+              - ec2:DeleteVpc
+              - ec2:DeleteInternetGateway
+              - ec2:DeleteRouteTable
+              - ec2:DeleteRoute
+              - ec2:DeleteNetworkAcl
+              - ec2:DeleteKeyPair
+              - ec2:DeleteLaunchTemplate
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/Environment": "Development"
+
+          - Sid: AllowS3DestructiveOnDevelopment
+            Effect: Allow
+            Action:
+              - s3:DeleteObject
+              - s3:DeleteObjectVersion
+              - s3:DeleteBucket
+              - s3:DeleteBucketPolicy
+              - s3:DeleteBucketWebsite
+              - s3:PutBucketPolicy
+              - s3:PutLifecycleConfiguration
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "aws:ResourceTag/Environment": "Development"
+      Groups:
+        - !Ref DeveloperGroup
+
+  # =========================================================================
+  # 2. OPS GROUP
+  # =========================================================================
+  OpsGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: Ops_Group
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/CloudWatchEventsFullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+        - arn:aws:iam::aws:policy/AmazonRDSFullAccess
+
+  # =========================================================================
+  # 3. FINANCE GROUP
+  # =========================================================================
+  FinanceGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: Finance_Group
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/job-function/Billing
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
+  # =========================================================================
+  # 4. DATA GROUP
+  # =========================================================================
+  DataGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: Data_Group
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonRDSReadOnlyAccess
+
+  # =========================================================================
+  # 5. STRAVACO ADMIN GROUP
+  # =========================================================================
+  StavacoAdminGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: Stravaco_Admin_Group
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AWSBillingConductorFullAccess
+        - arn:aws:iam::aws:policy/job-function/Billing
+        - arn:aws:iam::aws:policy/IAMUserChangePassword
+
+  # =========================================================================
+  # IAM USERS
+  # NOTE: John Baptiste (CIO) is omitted — no group assigned in the roster.
+  # =========================================================================
+
+  # --- Stravaco_Admin_Group -------------------------------------------------
+  UserAlexCook:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: acook
+      Path: /
+      Groups:
+        - !Ref StavacoAdminGroup
+      Tags:
+        - Key: Name
+          Value: Alex Cook
+        - Key: Title
+          Value: Chief Architect
+        - Key: Email
+          Value: acook@stravaco.biz
+        - Key: Team
+          Value: IT
+        - Key: Environment
+          Value: !Ref Environment
+
+  # --- Ops_Group ------------------------------------------------------------
+  UserSidharBrahamian:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: sbrahamian
+      Path: /
+      Groups:
+        - !Ref OpsGroup
+      Tags:
+        - Key: Name
+          Value: Sidhar Brahamian
+        - Key: Title
+          Value: Devops Lead
+        - Key: Email
+          Value: sbrahamian@stravaco.biz
+        - Key: Team
+          Value: Operations
+        - Key: Environment
+          Value: !Ref Environment
+
+  UserBertStichler:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: bstichler
+      Path: /
+      Groups:
+        - !Ref OpsGroup
+      Tags:
+        - Key: Name
+          Value: Bert Stichler
+        - Key: Title
+          Value: AWS Admin
+        - Key: Email
+          Value: bstichler@stravaco.biz
+        - Key: Team
+          Value: Operations
+        - Key: Environment
+          Value: !Ref Environment
+
+  # --- Developer_Group ------------------------------------------------------
+  UserLiamMckeown:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: lmckeown
+      Path: /
+      Groups:
+        - !Ref DeveloperGroup
+      Tags:
+        - Key: Name
+          Value: Liam Mckeown
+        - Key: Title
+          Value: Developer
+        - Key: Email
+          Value: lmckeown@stravaco.biz
+        - Key: Team
+          Value: Developer
+        - Key: Environment
+          Value: !Ref Environment
+
+  UserAngelaBrackett:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: abrackett
+      Path: /
+      Groups:
+        - !Ref DeveloperGroup
+      Tags:
+        - Key: Name
+          Value: Angela Brackett
+        - Key: Title
+          Value: Jr. Developer
+        - Key: Email
+          Value: abrackett@stravaco.biz
+        - Key: Team
+          Value: Developer
+        - Key: Environment
+          Value: !Ref Environment
+
+  UserSuriPalamadu:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: spalamadu
+      Path: /
+      Groups:
+        - !Ref DeveloperGroup
+      Tags:
+        - Key: Name
+          Value: Suri Palamadu
+        - Key: Title
+          Value: Senior Developer
+        - Key: Email
+          Value: spalamadu@stravaco.biz
+        - Key: Team
+          Value: Developer
+        - Key: Environment
+          Value: !Ref Environment
+
+  UserRasheedAlhamein:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: ralhamein
+      Path: /
+      Groups:
+        - !Ref DeveloperGroup
+      Tags:
+        - Key: Name
+          Value: Rasheed Alhamein
+        - Key: Title
+          Value: Development Manager
+        - Key: Email
+          Value: ralhamein@stravaco.biz
+        - Key: Team
+          Value: Developer
+        - Key: Environment
+          Value: !Ref Environment
+
+  # --- Data_Group -----------------------------------------------------------
+  UserAnupamSingh:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: asingh
+      Path: /
+      Groups:
+        - !Ref DataGroup
+      Tags:
+        - Key: Name
+          Value: Anupam Singh
+        - Key: Title
+          Value: Data Engineer
+        - Key: Email
+          Value: asingh@stravaco.biz
+        - Key: Team
+          Value: Data Analyst
+        - Key: Environment
+          Value: !Ref Environment
+
+  UserBethanyDoans:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: bdoans
+      Path: /
+      Groups:
+        - !Ref DataGroup
+      Tags:
+        - Key: Name
+          Value: Bethany Doans
+        - Key: Title
+          Value: Jr. Data Analyst
+        - Key: Email
+          Value: bdoans@stravaco.biz
+        - Key: Team
+          Value: Data Analyst
+        - Key: Environment
+          Value: !Ref Environment
+
+  UserFarahdKhuri:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: fkhuri
+      Path: /
+      Groups:
+        - !Ref DataGroup
+      Tags:
+        - Key: Name
+          Value: Farahd Khuri
+        - Key: Title
+          Value: Data Engineer
+        - Key: Email
+          Value: fkhuri@stravaco.biz
+        - Key: Team
+          Value: Data Analyst
+        - Key: Environment
+          Value: !Ref Environment
+
+  # --- Finance_Group --------------------------------------------------------
+  UserGordonMcEvoy:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: gmcevoy
+      Path: /
+      Groups:
+        - !Ref FinanceGroup
+      Tags:
+        - Key: Name
+          Value: Gordon McEvoy
+        - Key: Title
+          Value: Finance Manager
+        - Key: Email
+          Value: gmcevoy@stravaco.biz
+        - Key: Team
+          Value: Finance
+        - Key: Environment
+          Value: !Ref Environment
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+  DeveloperGroupArn:
+    Description: ARN of Developer_Group
+    Value: !GetAtt DeveloperGroup.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DeveloperGroupArn"
+
+  OpsGroupArn:
+    Description: ARN of Ops_Group
+    Value: !GetAtt OpsGroup.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-OpsGroupArn"
+
+  FinanceGroupArn:
+    Description: ARN of Finance_Group
+    Value: !GetAtt FinanceGroup.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-FinanceGroupArn"
+
+  DataGroupArn:
+    Description: ARN of Data_Group
+    Value: !GetAtt DataGroup.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DataGroupArn"
+
+  StavacoAdminGroupArn:
+    Description: ARN of Stravaco_Admin_Group
+    Value: !GetAtt StavacoAdminGroup.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-StavacoAdminGroupArn"
+      
