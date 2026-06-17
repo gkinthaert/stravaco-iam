@@ -13,4 +13,3 @@ new StravacoIamStack(app, "StravacoIamStack", {
     region: process.env.CDK_DEFAULT_REGION ?? "us-east-2",
   },
 });
-

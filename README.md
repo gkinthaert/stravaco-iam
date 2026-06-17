@@ -13,5 +13,9 @@ Deliverables - IaC
 2. Terraform configuration file
 3. Python boto3 script (create, assign env, teardown)
 3. AWS CDK and TypeScript
+    - npm run build
+    - cdk bootstrap (if first time running)
+    - cdk deploy
+    - cdk destroy
 
 

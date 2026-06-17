@@ -336,4 +336,3 @@ export class StravacoIamStack extends cdk.Stack {
     });
   }
 }
-
